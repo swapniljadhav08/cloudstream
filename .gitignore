@@ -1,0 +1,238 @@
+# =============================================================================
+# Automated Cloud-Native Video Transcoding and Streaming Platform
+# Comprehensive .gitignore for monorepo (frontend, backend, infrastructure)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Dependencies (Node.js / pnpm)
+# -----------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.pnp.js
+
+# -----------------------------------------------------------------------------
+# Build Outputs & Caches
+# -----------------------------------------------------------------------------
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# NestJS / TypeScript
+*.tsbuildinfo
+
+# Turbo (monorepo)
+.turbo/
+
+# Vercel
+.vercel
+
+# -----------------------------------------------------------------------------
+# Environment Variables (secrets must never be committed)
+# -----------------------------------------------------------------------------
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+.env.*.local
+!.env.example
+!.env.*.example
+
+# -----------------------------------------------------------------------------
+# Prisma
+# -----------------------------------------------------------------------------
+# Keep schema but ignore generated client
+backend/prisma/generated/
+
+# -----------------------------------------------------------------------------
+# Testing & Coverage
+# -----------------------------------------------------------------------------
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+junit.xml
+
+# Playwright
+/playwright/.cache/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Jest
+jest.cache/
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+logs/
+*.log
+pino-*.log
+loki-*.log
+
+# -----------------------------------------------------------------------------
+# IDE & Editor
+# -----------------------------------------------------------------------------
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# JetBrains (IntelliJ, WebStorm, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# -----------------------------------------------------------------------------
+# Operating System Files
+# -----------------------------------------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# -----------------------------------------------------------------------------
+# Docker
+# -----------------------------------------------------------------------------
+# Ignore local Docker volumes and data
+docker/data/
+docker/volumes/
+minio_data/
+postgres_data/
+redis_data/
+
+# Docker override files (local customizations)
+docker-compose.override.yml
+docker-compose.*.override.yml
+
+# -----------------------------------------------------------------------------
+# Kubernetes
+# -----------------------------------------------------------------------------
+# Ignore local Kubernetes secrets
+infrastructure/kubernetes/**/secrets.yaml
+infrastructure/kubernetes/**/secret.yaml
+*.kube-secret
+
+# -----------------------------------------------------------------------------
+# Terraform
+# -----------------------------------------------------------------------------
+infrastructure/terraform/**/.terraform/
+infrastructure/terraform/**/*.tfstate
+infrastructure/terraform/**/*.tfstate.*
+infrastructure/terraform/**/*.tfvars
+!infrastructure/terraform/**/*.tfvars.example
+infrastructure/terraform/**/crash.log
+infrastructure/terraform/**/override.tf
+infrastructure/terraform/**/override.tf.json
+infrastructure/terraform/**/*.tfplan
+
+# -----------------------------------------------------------------------------
+# Video Processing (FFmpeg temp files, uploads, transcoded outputs)
+# -----------------------------------------------------------------------------
+# Local upload temp directories
+uploads/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Transcoded video outputs (local dev)
+transcoded/
+hls/
+thumbnails/
+previews/
+
+# FFmpeg intermediate files
+*.ts.bak
+*.mp4.bak
+*.m3u8.bak
+
+# -----------------------------------------------------------------------------
+# MinIO / Object Storage (local development data)
+# -----------------------------------------------------------------------------
+minio/
+minio-data/
+minio_config/
+
+# -----------------------------------------------------------------------------
+# Security & Secrets
+# -----------------------------------------------------------------------------
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+*.secret
+
+# -----------------------------------------------------------------------------
+# Husky (git hooks - keep the husky directory but ignore generated files)
+# -----------------------------------------------------------------------------
+.husky/_/
+
+# -----------------------------------------------------------------------------
+# Misc
+# -----------------------------------------------------------------------------
+*.swp
+*.swo
+*.bak
+*.cache
+*.pid
+*.seed
+*.pid.lock
+
+# ESLint cache
+.eslintcache
+
+# Stylelint cache
+.stylelintcache
+
+# Parcel cache
+.cache/
+.parcel-cache/
+
+# Storybook
+storybook-static/
+
+# -----------------------------------------------------------------------------
+# Documentation build artifacts (if using tools like MkDocs, Docusaurus, etc.)
+# -----------------------------------------------------------------------------
+site/
+docs-build/
+
+# -----------------------------------------------------------------------------
+# Sentry / Error tracking config (local)
+# -----------------------------------------------------------------------------
+.sentryclirc
