@@ -39,42 +39,65 @@ All project documentation is available in the `docs/` directory:
 
 ### Infrastructure
 - PostgreSQL 16, Redis 7
-- Docker, Docker Compose
+- Docker, Terraform (infrastructure as code)
 - Prometheus, Grafana, Loki
 
 ## Quick Start
 
+Requires Docker, Terraform >= 1.6 and Node >= 22. No local ffmpeg needed: the
+worker is containerised and brings its own.
+
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/video-streaming-platform.git
-cd video-streaming-platform
+# 1. Provision infrastructure (PostgreSQL, Redis, S3-compatible storage,
+#    bucket layout, access policy, CORS). Also writes .env, .env.docker and
+#    frontend/.env.local from its outputs.
+cd infrastructure/terraform/environments/local
+terraform init && terraform apply
+cd -
 
-# Start development environment
-docker-compose up -d
+# 2. Install dependencies and apply the schema
+npm install
+npm run -w backend db:migrate
+npm run -w backend db:seed      # admin@example.com / creator@example.com
 
-# Install dependencies
-pnpm install
+# 3. Start the services (each in its own terminal)
+npm run dev:backend             # API on :3001
+npm run dev:frontend            # UI  on :3000
 
-# Run migrations
-pnpm prisma migrate dev
-
-# Start development servers
-pnpm dev
+# 4. Start the transcoding worker
+npm run worker:build
+npm run worker:up               # logs: npm run worker:logs
 ```
 
-## Project Structure
+Then open http://localhost:3000 and sign in as `creator@example.com` /
+`CreatorPass123!`.
 
+Tear the stack down with `npm run infra:down`.
+
+### Verifying
+
+```bash
+npm test          # unit tests for the ladder, playlists, tokens, upload policy
+npm run test:e2e  # end-to-end: upload -> transcode -> adaptive playback
 ```
-video-streaming-platform/
-├── docs/                    # Project documentation
-│   ├── diagrams/         # Architecture diagrams
-│   ├── assets/           # Documentation assets
-│   └── *.md              # Documentation files
-├── frontend/             # Next.js frontend application
-├── backend/              # NestJS backend application
-├── infrastructure/       # Docker, Kubernetes, CI/CD
-└── README.md
-```
+
+## Infrastructure as Code
+
+Terraform owns all infrastructure; there is no docker-compose file. The same
+configuration targets local and cloud:
+
+| Path | Purpose |
+|------|---------|
+| `modules/platform-contract` | Bucket layout, lifecycle rules and the ABR ladder, declared once |
+| `modules/storage-s3` | S3 bucket, access policy, CORS, lifecycle. Applied unchanged against LocalStack and real AWS |
+| `modules/local-stack` | PostgreSQL, Redis and LocalStack containers standing in for RDS, ElastiCache and S3 |
+| `modules/aws-stack` | RDS PostgreSQL, ElastiCache Redis, S3 |
+| `modules/oci-stack` | OCI PostgreSQL, OCI Cache, OCI Object Storage via its S3-compatible API |
+| `environments/{local,aws,oci}` | Thin roots; every stack exposes the same outputs |
+
+Because all three stacks expose the same output surface, moving to a cloud
+provider is `cd environments/aws && terraform apply` plus rendering the
+application config from `terraform output -json app_config`.
 
 ## Development Phases
 
@@ -85,13 +108,13 @@ video-streaming-platform/
 - ✅ HLS streaming support
 
 ### Phase 2: Scale
-- Chunked upload for large files
+- Chunked/resumable upload for very large files
 - Advanced analytics dashboard
 - Webhook notifications
 - Performance optimization
 
 ### Phase 3: Enterprise
-- Audit logging
+- ☑ Audit logging
 - Custom transcoding profiles
 - API rate limiting
 - Advanced security features

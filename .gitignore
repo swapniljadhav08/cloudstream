@@ -236,3 +236,9 @@ docs-build/
 # Sentry / Error tracking config (local)
 # -----------------------------------------------------------------------------
 .sentryclirc
+# Terraform-generated application config (contains the dev JWT secret
+# and database credentials)
+.env.docker
+
+# Terraform lock files belong to root modules (environments/), not child modules
+infrastructure/terraform/modules/*/.terraform.lock.hcl
