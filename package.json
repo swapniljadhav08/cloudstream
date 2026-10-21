@@ -1,0 +1,29 @@
+{
+  "name": "video-streaming-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated Cloud-Native Video Transcoding and Streaming Platform",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "worker",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "infra:up": "cd infrastructure/terraform/environments/local && terraform apply -auto-approve",
+    "infra:down": "cd infrastructure/terraform/environments/local && terraform destroy -auto-approve",
+    "db:migrate": "npm run -w backend db:migrate",
+    "db:seed": "npm run -w backend db:seed",
+    "worker:build": "docker build -f infrastructure/docker/worker.Dockerfile -t video-streaming-worker:local .",
+    "worker:up": "bash infrastructure/scripts/run-worker.sh",
+    "worker:logs": "docker logs -f video-streaming-local-worker",
+    "dev:backend": "npm run -w backend dev",
+    "dev:frontend": "npm run -w frontend dev",
+    "build": "npm run -w backend build && npm run -w frontend build",
+    "test": "npm run -w backend test",
+    "test:e2e": "bash infrastructure/scripts/smoke-test.sh"
+  }
+}

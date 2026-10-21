@@ -1,0 +1,26 @@
+{
+  "name": "@video-streaming/worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node -r ts-node/register/transpile-only --env-file=.env src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.726.0",
+    "@prisma/client": "^6.2.1",
+    "@video-streaming/shared": "*",
+    "bullmq": "^5.34.6",
+    "ioredis": "^5.4.2",
+    "pino": "^9.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "prisma": "^6.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
