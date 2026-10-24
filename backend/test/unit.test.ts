@@ -15,6 +15,7 @@ import { durationToMs, durationToSeconds } from '../src/shared/kernel/duration';
 import { issueStreamToken, verifyStreamToken, mediaContentType } from '../src/shared/kernel/stream-token';
 import { looksLikeVideo } from '../src/modules/video/domain/upload-policy';
 import { avcCodecString, buildMasterPlaylist } from '../../worker/src/playlist';
+import { streamIdentity } from '../../frontend/src/lib/stream-url';
 
 const SECRET = 'a'.repeat(64);
 
@@ -177,4 +178,59 @@ test('delivered media is told apart from private artefacts', () => {
   // A key with no video prefix is never delivered media.
   assert.ok(!isDeliveredMedia('original.mp4'));
   assert.ok(!isDeliveredMedia(''));
+});
+
+test('a viewer gets the same playback URL inside a window, but never a shorter life', () => {
+  const claims = { videoId: 'v1', userId: 'u1' };
+  const ttl = 3600;
+  const bucket = 900;
+
+  // The regression: tokens used to embed an expiry to the exact second, so two
+  // fetches a moment apart produced different URLs and the player restarted.
+  const a = issueStreamToken(claims, SECRET, ttl, bucket);
+  const b = issueStreamToken(claims, SECRET, ttl, bucket);
+  assert.equal(a, b);
+
+  // Different viewers and different videos still get different tokens.
+  assert.notEqual(a, issueStreamToken({ videoId: 'v1', userId: 'u2' }, SECRET, ttl, bucket));
+  assert.notEqual(a, issueStreamToken({ videoId: 'v2', userId: 'u1' }, SECRET, ttl, bucket));
+
+  // The stable token still verifies...
+  assert.deepEqual(verifyStreamToken(a, 'v1', SECRET), claims);
+
+  // ...and rounding up can only lengthen validity, never cut it below the TTL.
+  const encoded = a.slice(0, a.lastIndexOf('.'));
+  const expiresAt = Number(Buffer.from(encoded, 'base64url').toString('utf8').split('.')[2]);
+  const now = Math.floor(Date.now() / 1000);
+  assert.ok(expiresAt - now >= ttl - 1, 'lifetime must be at least the TTL');
+  assert.ok(expiresAt - now <= ttl + bucket, 'lifetime must not exceed TTL plus one bucket');
+  assert.equal(expiresAt % bucket, 0, 'expiry lands on a bucket boundary');
+
+  // Without a bucket, behaviour is unchanged: exact expiry, so a negative TTL
+  // is already expired.
+  assert.equal(verifyStreamToken(issueStreamToken(claims, SECRET, -1), 'v1', SECRET), null);
+});
+
+test('a refreshed credential does not change the identity of a stream', () => {
+  const base = 'http://localhost:3001/api/v1/videos/abc/hls';
+
+  // Same stream, two tokens: must compare equal so the player does not reload.
+  assert.equal(
+    streamIdentity(`${base}/tokenAAAA.sigAAAA/master.m3u8`),
+    streamIdentity(`${base}/tokenBBBB.sigBBBB/master.m3u8`),
+  );
+
+  // A different video is a different stream.
+  assert.notEqual(
+    streamIdentity(`${base}/tokenAAAA.sigAAAA/master.m3u8`),
+    streamIdentity('http://localhost:3001/api/v1/videos/xyz/hls/tokenAAAA.sigAAAA/master.m3u8'),
+  );
+
+  // Public URLs carry no token and must pass through untouched.
+  const pub = 'http://localhost:4566/video-streaming/abc/hls/master.m3u8';
+  assert.equal(streamIdentity(pub), pub);
+
+  // A token-shaped path that is not the master playlist is left alone.
+  const other = `${base}/tokenAAAA.sigAAAA/720p/master.m3u8`;
+  assert.equal(streamIdentity(other), other);
 });

@@ -18,6 +18,9 @@ import {
 } from '../domain/upload-policy';
 import type { ListVideosQuery, UpdateVideoInput, UploadMetadata } from '../presentation/dtos';
 
+/** Window within which a viewer gets the same playback URL. See issueStreamToken. */
+const STREAM_TOKEN_BUCKET_SECONDS = 900;
+
 export type VideoView = {
   id: string;
   title: string;
@@ -319,6 +322,7 @@ export class VideoService {
       { videoId: video.id, userId: video.userId },
       cfg.JWT_SECRET,
       cfg.STREAM_TOKEN_TTL_SECONDS,
+      STREAM_TOKEN_BUCKET_SECONDS,
     );
 
     return `${cfg.API_URL}/api/v1/videos/${video.id}/hls/${token}/master.m3u8`;
