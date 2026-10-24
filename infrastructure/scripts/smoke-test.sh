@@ -120,6 +120,15 @@ PRIVATE_PB="$(curl -s "$API/videos/$PRIVATE_ID" -H "Authorization: Bearer $TOKEN
 PRIVATE_BASE="$(dirname "$PRIVATE_PB")"
 
 check "owner can read the record" "$(status_of "$API/videos/$PRIVATE_ID" -H "Authorization: Bearer $TOKEN")" "200"
+
+# Regression: the playback URL embeds a token, and the player page re-fetches
+# the record while a video encodes. If each fetch returned a different URL the
+# player would treat it as a new stream and restart from the beginning every
+# few seconds -- so two fetches a moment apart must agree.
+URL_A="$(curl -s "$API/videos/$PRIVATE_ID" -H "Authorization: Bearer $TOKEN" | json 'd["data"]["playbackUrl"]')"
+sleep 2
+URL_B="$(curl -s "$API/videos/$PRIVATE_ID" -H "Authorization: Bearer $TOKEN" | json 'd["data"]["playbackUrl"]')"
+check "playback URL is stable across fetches" "$([[ "$URL_A" == "$URL_B" ]] && echo same || echo different)" "same"
 check "anonymous cannot read the record" "$(status_of "$API/videos/$PRIVATE_ID")" "401"
 check "playlist loads with the token alone" "$(status_of "$PRIVATE_PB")" "200"
 check "nested segment loads with the same token" "$(status_of "$PRIVATE_BASE/720p/segment_0.ts")" "200"

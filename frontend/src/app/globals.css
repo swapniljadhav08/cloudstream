@@ -7,5 +7,36 @@
 }
 
 body {
-  @apply bg-surface text-slate-100 antialiased;
+  @apply bg-ground text-ink antialiased;
+}
+
+/* A visible focus ring on everything interactive, never removed. */
+@layer base {
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-ground;
+  }
+}
+
+/* Nothing conveys meaning by movement alone. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Video.js: match the product surface rather than its default chrome. */
+.video-js .vjs-control-bar {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0));
+}
+.video-js .vjs-big-play-button {
+  border: none;
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 999px;
+  width: 72px;
+  height: 72px;
+  line-height: 72px;
 }

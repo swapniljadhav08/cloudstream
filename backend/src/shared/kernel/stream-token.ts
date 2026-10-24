@@ -27,8 +27,21 @@ export function issueStreamToken(
   payload: StreamTokenPayload,
   secret: string,
   ttlSeconds: number,
+  bucketSeconds = 0,
 ): string {
-  const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const now = Math.floor(Date.now() / 1000);
+  const exact = now + ttlSeconds;
+
+  // With a bucket, expiry rounds UP to the next boundary, so every token
+  // issued inside one window is byte-for-byte identical.
+  //
+  // This matters because the token is part of the playback URL, and a player
+  // treats a changed URL as a different stream. An expiry to the exact second
+  // made every fetch of the same video yield a new URL, so a page that polls
+  // the record (as the player page does while a video encodes) kept handing
+  // the player a "new" source and restarting playback. Rounding up never
+  // shortens the lifetime: validity is between ttl and ttl + bucket.
+  const expiresAt = bucketSeconds > 0 ? Math.ceil(exact / bucketSeconds) * bucketSeconds : exact;
   const data = `${payload.videoId}.${payload.userId}.${expiresAt}`;
   return `${Buffer.from(data).toString('base64url')}.${sign(data, secret)}`;
 }

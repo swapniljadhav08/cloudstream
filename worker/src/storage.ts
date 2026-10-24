@@ -4,6 +4,7 @@ import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { isDeliveredMedia } from '@video-streaming/shared';
 import { loadConfig } from './config';
 
 const cfg = loadConfig();
@@ -18,8 +19,21 @@ export const s3 = new S3Client({
   },
 });
 
+const MEDIA_BUCKET = cfg.S3_BUCKET_MEDIA ?? cfg.S3_BUCKET;
+
+/**
+ * The bucket holding a given key.
+ *
+ * Delivered media (playlists, segments, thumbnails, the preview) is publicly
+ * readable; originals and the metadata sidecar are not. Where one bucket can
+ * express both, the two names are equal and this is a no-op.
+ */
+function bucketFor(key: string): string {
+  return isDeliveredMedia(key) ? MEDIA_BUCKET : cfg.S3_BUCKET;
+}
+
 export async function downloadToFile(key: string, destPath: string): Promise<void> {
-  const res = await s3.send(new GetObjectCommand({ Bucket: cfg.S3_BUCKET, Key: key }));
+  const res = await s3.send(new GetObjectCommand({ Bucket: bucketFor(key), Key: key }));
   if (!res.Body) {
     throw new Error(`Object not found: ${key}`);
   }
@@ -37,7 +51,7 @@ export async function uploadFile(
 
   await s3.send(
     new PutObjectCommand({
-      Bucket: cfg.S3_BUCKET,
+      Bucket: bucketFor(key),
       Key: key,
       Body: createReadStream(filePath),
       ContentLength: size,
@@ -57,7 +71,7 @@ export async function uploadText(
 ): Promise<void> {
   await s3.send(
     new PutObjectCommand({
-      Bucket: cfg.S3_BUCKET,
+      Bucket: bucketFor(key),
       Key: key,
       Body: body,
       ContentType: contentType,

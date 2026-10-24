@@ -1,82 +1,147 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { Alert, PageHeader, Panel, formatBytes } from '@/components/ui';
 
 type Stats = Awaited<ReturnType<typeof api.adminStats>>;
+
+const QUEUE_ORDER = ['waiting', 'active', 'completed', 'failed', 'delayed'] as const;
+
+const QUEUE_TONE: Record<string, string> = {
+  active: 'border-status-processing/36 bg-status-processing/10 text-status-processing',
+  failed: 'border-status-failed/40 bg-status-failed/10 text-status-failed',
+};
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [updated, setUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const load = () =>
-      api
-        .adminStats()
-        .then(setStats)
-        .catch((err: unknown) =>
-          setError(err instanceof ApiError ? err.message : 'Could not load stats'),
-        );
-
-    void load();
-    const timer = setInterval(() => void load(), 5000);
-    return () => clearInterval(timer);
+  const load = useCallback(() => {
+    api
+      .adminStats()
+      .then((next) => {
+        setStats(next);
+        setUpdated(new Date());
+        setError(null);
+      })
+      .catch((err: unknown) =>
+        setError(
+          err instanceof ApiError && err.status === 403
+            ? 'This page needs an administrator account.'
+            : err instanceof ApiError
+              ? err.message
+              : 'Could not load statistics',
+        ),
+      );
   }, []);
 
-  if (error) return <p className="text-red-400">{error}</p>;
-  if (!stats) return <p className="text-slate-400">Loading...</p>;
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
+  }, [load]);
 
-  return (
-    <div className="space-y-8">
-      <h1 className="text-xl font-semibold">System overview</h1>
-
-      <Section title="Users">
-        <Tile label="Total" value={stats.users.total} />
-        <Tile label="Active" value={stats.users.active} />
-        <Tile label="Storage used" value={formatBytes(stats.storage.totalBytesUsed)} />
-      </Section>
-
-      <Section title="Videos by status">
-        {Object.entries(stats.videos).map(([status, count]) => (
-          <Tile key={status} label={status} value={count} />
-        ))}
-      </Section>
-
-      <Section title="Transcode queue">
-        {Object.entries(stats.jobs).map(([state, count]) => (
-          <Tile key={state} label={state} value={count} />
-        ))}
-      </Section>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-400">{title}</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{children}</div>
-    </section>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-lg border border-surface-border bg-surface-raised p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Operations" />
+        <Alert tone="error" title="Not available">
+          {error}
+        </Alert>
+      </>
+    );
   }
-  return `${value.toFixed(1)} ${units[unit]}`;
+
+  if (!stats) return <p className="text-ink-muted">Loading…</p>;
+
+  const videoStates = Object.entries(stats.videos).filter(([, count]) => count > 0);
+  const failedJobs = stats.jobs.failed ?? 0;
+
+  return (
+    <>
+      <PageHeader
+        title="Operations"
+        subtitle={updated ? `Updated ${updated.toLocaleTimeString()} · refreshes every 5s` : undefined}
+        action={
+          <span
+            className={`inline-flex min-h-[42px] items-center gap-2 rounded-control border px-3.5 text-sm font-semibold ${
+              failedJobs > 0
+                ? 'border-status-failed/40 bg-status-failed/10 text-status-failed'
+                : 'border-status-ready/40 bg-status-ready/10 text-status-ready'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${failedJobs > 0 ? 'bg-status-failed' : 'bg-status-ready'}`} />
+            {failedJobs > 0 ? `${failedJobs} failed jobs` : 'Queue healthy'}
+          </span>
+        }
+      />
+
+      <section className="flex flex-col gap-3.5">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Accounts</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Panel className="flex flex-col gap-2">
+            <span className="text-[13px] text-ink-muted">Users</span>
+            <span className="text-2xl font-semibold tabular-nums">{stats.users.total}</span>
+          </Panel>
+          <Panel className="flex flex-col gap-2">
+            <span className="text-[13px] text-ink-muted">Active</span>
+            <span className="text-2xl font-semibold tabular-nums text-status-ready">{stats.users.active}</span>
+          </Panel>
+          <Panel className="flex flex-col gap-2">
+            <span className="text-[13px] text-ink-muted">Storage in use</span>
+            <span className="text-2xl font-semibold tabular-nums">{formatBytes(stats.storage.totalBytesUsed)}</span>
+          </Panel>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3.5">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Transcode queue</h2>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {QUEUE_ORDER.map((key) => (
+            <div
+              key={key}
+              className={`flex flex-col gap-1 rounded-[9px] border p-3.5 ${
+                QUEUE_TONE[key] ?? 'border-surface-border bg-surface-inset text-ink-muted'
+              }`}
+            >
+              <span className="text-xs capitalize">{key}</span>
+              <span className="text-xl font-semibold tabular-nums">{stats.jobs[key] ?? 0}</span>
+            </div>
+          ))}
+        </div>
+        {failedJobs > 0 && (
+          <Alert tone="error" title={`${failedJobs} ${failedJobs === 1 ? 'job has' : 'jobs have'} failed`}>
+            Open each video to see the worker&rsquo;s own message and retry it. A bulk retry view is not built yet.
+          </Alert>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3.5">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">Videos by status</h2>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {videoStates.length === 0 ? (
+            <Panel className="text-[13px] text-ink-muted">No videos yet.</Panel>
+          ) : (
+            videoStates.map(([status, count]) => (
+              <div key={status} className="flex flex-col gap-1 rounded-[9px] border border-surface-border bg-surface-inset p-3.5">
+                <span className="text-xs capitalize text-ink-muted">{status.toLowerCase()}</span>
+                <span className="text-xl font-semibold tabular-nums">{count}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <Panel className="flex flex-col gap-2">
+        <span className="text-sm font-semibold">Not built yet</span>
+        <p className="text-[13px] leading-relaxed text-ink-muted">
+          Per-user management, quota overrides and the audit-log viewer are designed but unimplemented. The API already
+          serves <code className="font-mono">/admin/jobs</code> and <code className="font-mono">/admin/audit</code>, so
+          these are UI work rather than backend work.
+        </p>
+      </Panel>
+    </>
+  );
 }

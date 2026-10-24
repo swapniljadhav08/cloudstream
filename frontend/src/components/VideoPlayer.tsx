@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import videojs from 'video.js';
 import type Player from 'video.js/dist/types/player';
 import 'video.js/dist/video-js.css';
+import { streamIdentity } from '@/lib/stream-url';
 
 export type VideoPlayerProps = {
   src: string;
@@ -121,12 +122,22 @@ export function VideoPlayer({
   }, []);
 
   // Source changes are applied to the existing player rather than recreating it.
+  //
+  // Only a change of *stream* reloads it. The parent re-fetches the video
+  // record while it encodes, and each fetch can carry a freshly signed URL for
+  // the same stream; reloading on that would restart playback from the start
+  // every few seconds. The token in the URL is a credential, not an identity.
+  const appliedStream = useRef<string | null>(null);
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
 
-    setReady(false);
-    player.src({ src, type: 'application/x-mpegURL' });
+    const identity = streamIdentity(src);
+    if (appliedStream.current !== identity) {
+      appliedStream.current = identity;
+      setReady(false);
+      player.src({ src, type: 'application/x-mpegURL' });
+    }
     if (poster) player.poster(poster);
   }, [src, poster]);
 

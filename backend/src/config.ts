@@ -24,6 +24,12 @@ const envSchema = z.object({
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
+  /**
+   * Bucket for media the player fetches. Defaults to S3_BUCKET, which is
+   * right wherever one bucket can serve public and private content. GCS
+   * cannot, so there this names a second, public bucket.
+   */
+  S3_BUCKET_MEDIA: z.string().min(1).optional(),
   S3_FORCE_PATH_STYLE: z
     .enum(['true', 'false'])
     .default('true')
