@@ -14,6 +14,8 @@ const envSchema = z.object({
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
+  /** See the backend's config: defaults to S3_BUCKET unless storage needs a split. */
+  S3_BUCKET_MEDIA: z.string().min(1).optional(),
   S3_FORCE_PATH_STYLE: z
     .enum(['true', 'false'])
     .default('true')

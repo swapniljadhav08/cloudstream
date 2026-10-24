@@ -38,3 +38,20 @@ export const storageKeys = {
 export function hlsSubPath(path: string): string {
   return `hls/${path.replace(/^\/+/, '')}`;
 }
+
+/**
+ * True when a key is media the player fetches directly, rather than a private
+ * artefact like the uploaded original or the metadata sidecar.
+ *
+ * This is the one place the public/private split is decided. S3 expresses it
+ * as a bucket policy over key patterns; GCS has no prefix-scoped anonymous
+ * read, so there the delivered media lives in a separate public bucket and
+ * this predicate chooses between the two. Where one bucket serves both roles
+ * the two names are equal and the choice is a no-op.
+ */
+export function isDeliveredMedia(key: string): boolean {
+  const slash = key.indexOf('/');
+  if (slash === -1) return false;
+  const rest = key.slice(slash + 1);
+  return rest.startsWith('hls/') || rest.startsWith('thumbnails/') || rest === 'preview.gif';
+}

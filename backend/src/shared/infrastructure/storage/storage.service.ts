@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
+import { isDeliveredMedia } from '@video-streaming/shared';
 import { loadConfig } from '../../../config';
 import { AppError } from '../../kernel/errors';
 import { logger } from '../logger/logger';
@@ -24,11 +25,13 @@ import { logger } from '../logger/logger';
 export class StorageService implements OnModuleInit {
   private readonly client: S3Client;
   private readonly bucket: string;
+  private readonly mediaBucket: string;
   private readonly publicBaseUrl: string;
 
   constructor() {
     const cfg = loadConfig();
     this.bucket = cfg.S3_BUCKET;
+    this.mediaBucket = cfg.S3_BUCKET_MEDIA ?? cfg.S3_BUCKET;
     this.publicBaseUrl = cfg.NEXT_PUBLIC_MEDIA_BASE_URL.replace(/\/+$/, '');
 
     this.client = new S3Client({
@@ -61,10 +64,15 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  /** The bucket holding a given key. Identical unless storage is split. */
+  private bucketFor(key: string): string {
+    return isDeliveredMedia(key) ? this.mediaBucket : this.bucket;
+  }
+
   async putObject(key: string, body: Buffer | Readable, contentType: string): Promise<void> {
     await this.client.send(
       new PutObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.bucketFor(key),
         Key: key,
         Body: body,
         ContentType: contentType,
@@ -87,7 +95,7 @@ export class StorageService implements OnModuleInit {
 
     const upload = new Upload({
       client: this.client,
-      params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
+      params: { Bucket: this.bucketFor(key), Key: key, Body: body, ContentType: contentType },
       queueSize: 4,
       partSize: 16 * 1024 * 1024,
     });
@@ -99,7 +107,7 @@ export class StorageService implements OnModuleInit {
   async getObjectStream(key: string): Promise<Readable> {
     let res;
     try {
-      res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      res = await this.client.send(new GetObjectCommand({ Bucket: this.bucketFor(key), Key: key }));
     } catch (err) {
       // A caller asking for a segment that does not exist -- a playlist read
       // mid-transcode, say -- is a 404, not a server fault.
@@ -119,20 +127,35 @@ export class StorageService implements OnModuleInit {
   async presignedGetUrl(key: string, expiresInSeconds: number): Promise<string> {
     return getSignedUrl(
       this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      new GetObjectCommand({ Bucket: this.bucketFor(key), Key: key }),
       { expiresIn: expiresInSeconds },
     );
   }
 
-  /** Deletes every object under a prefix. Used when a video is hard-deleted. */
+  /**
+   * Deletes every object under a prefix, across both buckets.
+   *
+   * A video's bytes are split between the private and media buckets, so a
+   * delete that swept only one would leave the other half orphaned and still
+   * billed. Where the two names are equal the second pass is skipped.
+   */
   async deletePrefix(prefix: string): Promise<number> {
+    const buckets = this.mediaBucket === this.bucket ? [this.bucket] : [this.bucket, this.mediaBucket];
+    let deleted = 0;
+    for (const bucket of buckets) {
+      deleted += await this.deletePrefixFrom(bucket, prefix);
+    }
+    return deleted;
+  }
+
+  private async deletePrefixFrom(bucket: string, prefix: string): Promise<number> {
     let deleted = 0;
     let continuationToken: string | undefined;
 
     do {
       const listed = await this.client.send(
         new ListObjectsV2Command({
-          Bucket: this.bucket,
+          Bucket: bucket,
           Prefix: prefix,
           ContinuationToken: continuationToken,
         }),
@@ -145,7 +168,7 @@ export class StorageService implements OnModuleInit {
       if (keys.length > 0) {
         await this.client.send(
           new DeleteObjectsCommand({
-            Bucket: this.bucket,
+            Bucket: bucket,
             Delete: { Objects: keys.map((Key) => ({ Key })) },
           }),
         );

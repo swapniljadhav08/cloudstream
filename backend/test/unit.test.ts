@@ -8,6 +8,7 @@ import {
   isUpscale,
   storageKeys,
   hlsSubPath,
+  isDeliveredMedia,
   RENDITION_LADDER,
 } from '@video-streaming/shared';
 import { durationToMs, durationToSeconds } from '../src/shared/kernel/duration';
@@ -158,4 +159,22 @@ test('container sniffing accepts real signatures and rejects impostors', () => {
   assert.ok(!looksLikeVideo(Buffer.from('#!/bin/sh\necho hi')));
   assert.ok(!looksLikeVideo(Buffer.from([0x89, 0x50, 0x4e, 0x47]))); // png
   assert.ok(!looksLikeVideo(Buffer.alloc(0)));
+});
+
+test('delivered media is told apart from private artefacts', () => {
+  // Public: what the player fetches.
+  assert.ok(isDeliveredMedia('vid1/hls/master.m3u8'));
+  assert.ok(isDeliveredMedia('vid1/hls/720p/segment_0.ts'));
+  assert.ok(isDeliveredMedia('vid1/thumbnails/10s.jpg'));
+  assert.ok(isDeliveredMedia('vid1/preview.gif'));
+
+  // Private: the upload itself and its sidecar must never be served.
+  assert.ok(!isDeliveredMedia('vid1/original.mp4'));
+  assert.ok(!isDeliveredMedia('vid1/metadata.json'));
+  assert.ok(!isDeliveredMedia('temp/vid1/scratch.ts'));
+  assert.ok(!isDeliveredMedia('logs/worker.log'));
+
+  // A key with no video prefix is never delivered media.
+  assert.ok(!isDeliveredMedia('original.mp4'));
+  assert.ok(!isDeliveredMedia(''));
 });
