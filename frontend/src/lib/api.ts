@@ -211,6 +211,32 @@ export const api = {
     return data;
   },
 
+  async updateVideo(
+    id: string,
+    patch: { title?: string; description?: string; isPublic?: boolean },
+  ): Promise<Video> {
+    const { data } = await request<Video>(`/videos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+    return data;
+  },
+
+  /**
+   * Re-runs the transcode from the stored original.
+   *
+   * `allowUpscale` produces the full ladder from a low-resolution source. The
+   * extra rungs are interpolated, so it is for exercising the quality menu,
+   * not for quality.
+   */
+  async reprocess(id: string, allowUpscale = false): Promise<{ processingJobId: string }> {
+    const { data } = await request<{ processingJobId: string }>(`/videos/${id}/reprocess`, {
+      method: 'POST',
+      body: JSON.stringify({ allowUpscale }),
+    });
+    return data;
+  },
+
   async deleteVideo(id: string): Promise<void> {
     await request(`/videos/${id}`, { method: 'DELETE' });
   },

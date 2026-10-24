@@ -22,8 +22,11 @@
     "worker:logs": "docker logs -f video-streaming-local-worker",
     "dev:backend": "npm run -w backend dev",
     "dev:frontend": "npm run -w frontend dev",
-    "build": "npm run -w backend build && npm run -w frontend build",
+    "build": "npm run build:shared && npm run -w backend build && npm run -w frontend build",
     "test": "npm run -w backend test",
-    "test:e2e": "bash infrastructure/scripts/smoke-test.sh"
+    "test:e2e": "bash infrastructure/scripts/smoke-test.sh",
+    "build:shared": "npm run -w @video-streaming/shared build",
+    "deploy:local": "bash infrastructure/scripts/deploy-local.sh",
+    "deploy:down": "bash infrastructure/scripts/deploy-local.sh --down"
   }
 }
